@@ -1,8 +1,10 @@
 ﻿
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NLog;
 using NLog.Web;
+using SmsGateway.API.Middleware;
 using SmsGateway.Common.ApiClient;
 using SmsGateway.Implement.ApplicationDbContext;
 using SmsGateway.Implement.Interface;
@@ -68,6 +70,11 @@ try
     opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
     #endregion
 
+    // Add authentication with API key scheme
+    builder.Services.AddAuthentication("ApiKey")
+        .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>("ApiKey", null);
+
+
     #region Add services to the container.
     logger.Info("🟢  Add services...");
     builder.Services.AddHttpClient<IApiClient, ApiClient>();
@@ -117,11 +124,11 @@ try
     logger.Info("End Update migration");
 
     // Configure the HTTP request pipeline.
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI();
-    }
+    //if (app.Environment.IsDevelopment())
+    //{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    //}
     app.UseMiddleware<ApiMiddleware>();
     app.UseHttpsRedirection();
 
