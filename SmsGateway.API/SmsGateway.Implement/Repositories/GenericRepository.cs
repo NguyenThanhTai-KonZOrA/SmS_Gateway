@@ -33,9 +33,12 @@ namespace Implement.Repositories
         }
         public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate) =>
             _dbSet.AnyAsync(predicate);
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) =>
+            _dbSet.AnyAsync(predicate, cancellationToken);
         public async Task AddAsync(T entity) => await _dbSet.AddAsync(entity);
         public async Task AddRangeAsync(IEnumerable<T> entities) => await _dbSet.AddRangeAsync(entities);
         public void AddRange(IEnumerable<T> entities) => _dbSet.AddRange(entities);
+        public void UpdateRange(IEnumerable<T> entities) => _dbSet.UpdateRange(entities);
         public void Update(T entity) => _dbSet.Update(entity);
         public void Remove(T entity) => _dbSet.Remove(entity);
         public void RemoveRange(IEnumerable<T> entities) => _dbSet.RemoveRange(entities);
@@ -57,6 +60,13 @@ namespace Implement.Repositories
             }
             return await query.FirstOrDefaultAsync();
         }
+
+        public async Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken)
+        {
+            IQueryable<T> query = _dbSet.Where(predicate);
+            return await query.SingleOrDefaultAsync(cancellationToken);
+        }
+
         public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, params Expression<Func<T, object>>[] includeProperties)
         {
             IQueryable<T> query = _dbSet.Where(predicate);

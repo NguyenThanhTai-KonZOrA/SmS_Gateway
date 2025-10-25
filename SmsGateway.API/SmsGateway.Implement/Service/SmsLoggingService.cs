@@ -1,7 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
-using SmsGateway.Implement.ApplicationDbContext;
-using SmsGateway.Implement.EntityModels;
+﻿using SmsGateway.Implement.EntityModels;
+using SmsGateway.Implement.Repositories.Interface;
 using SmsGateway.Implement.Services.Interfaces;
+using SmsGateway.Implement.UnitOfWork;
 using SmsGateway.Implement.ViewModels.Request;
 using SmsGateway.Implement.ViewModels.Response;
 
@@ -9,13 +9,15 @@ namespace SmsGateway.Implement.Services
 {
     public class SmsLoggingService : ISmsLoggingService
     {
-        private readonly SmsGatewayDbContext _db;
-        private readonly ILogger<SmsLoggingService> _logger;
+        private readonly ISmsSendLogRepository _smsSendLogRepository;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public SmsLoggingService(SmsGatewayDbContext db, ILogger<SmsLoggingService> logger)
+        public SmsLoggingService(
+            ISmsSendLogRepository smsSendLogRepository,
+            IUnitOfWork unitOfWork)
         {
-            _db = db;
-            _logger = logger;
+            _smsSendLogRepository = smsSendLogRepository;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task LogAsync(SmsLogRequest request, SmsResponse response, string provider, bool success, string? correlationId, CancellationToken ct = default)
@@ -35,8 +37,8 @@ namespace SmsGateway.Implement.Services
                 CorrelationId = correlationId
             };
 
-            _db.SmsSendLogs.Add(log);
-            await _db.SaveChangesAsync(ct);
+            await _smsSendLogRepository.AddAsync(log);
+            await _unitOfWork.CompleteAsync(ct);
         }
     }
 }

@@ -12,8 +12,8 @@ using SmsGateway.Implement.ApplicationDbContext;
 namespace SmsGateway.Implement.Migrations
 {
     [DbContext(typeof(SmsGatewayDbContext))]
-    [Migration("20251024092150_Init SMS database")]
-    partial class InitSMSdatabase
+    [Migration("20251025074434_Init")]
+    partial class Init
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

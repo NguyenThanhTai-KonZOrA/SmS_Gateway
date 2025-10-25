@@ -1,39 +1,40 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using SmsGateway.Implement.ApplicationDbContext;
 using SmsGateway.Implement.EntityModels;
+using SmsGateway.Implement.Repositories.Interface;
 using SmsGateway.Implement.Services.Interfaces;
+using SmsGateway.Implement.UnitOfWork;
 using SmsGateway.Implement.ViewModels.SmsOtpSettings;
 
 namespace SmsGateway.Implement.Services
 {
     public class SmsRateLimiterService : ISmsRateLimiterService
     {
-        private readonly SmsGatewayDbContext _db;
         private readonly SmsRateLimitOptionSettings _options;
         private readonly ILogger<SmsRateLimiterService> _logger;
-
+        private readonly ISmsDailyStatisticRepository _smsDailyStatisticRepository;
+        private readonly IUnitOfWork _unitOfWork;
         public SmsRateLimiterService(
-            SmsGatewayDbContext db,
-            IOptions<SmsRateLimitOptionSettings> options,
-            ILogger<SmsRateLimiterService> logger)
+            SmsRateLimitOptionSettings options,
+            ISmsDailyStatisticRepository smsDailyStatisticRepository,
+            ILogger<SmsRateLimiterService> logger,
+            IUnitOfWork unitOfWork)
         {
-            _db = db;
             _logger = logger;
-            _options = options.Value;
+            _options = options;
+            _smsDailyStatisticRepository = smsDailyStatisticRepository;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task EnsureAllowedAsync(string phoneNumber, CancellationToken ct = default)
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-            var stat = await _db.SmsDailyStatistics
-                .SingleOrDefaultAsync(x => x.PhoneNumber == phoneNumber && x.Day == today, ct);
+            var statistic = await _smsDailyStatisticRepository.SingleOrDefaultAsync(x => x.PhoneNumber == phoneNumber && x.Day == today, ct);
 
-            if (stat == null)
+            if (statistic == null)
             {
-                stat = new SmsDailyStatistic
+                statistic = new SmsDailyStatistic
                 {
                     Id = Guid.NewGuid(),
                     PhoneNumber = phoneNumber,
@@ -42,20 +43,20 @@ namespace SmsGateway.Implement.Services
                     SuccessCount = 0,
                     LockedUntilUtc = null
                 };
-                _db.SmsDailyStatistics.Add(stat);
-                await _db.SaveChangesAsync(ct);
+                await _smsDailyStatisticRepository.AddAsync(statistic);
+                await _unitOfWork.CompleteAsync(ct);
             }
 
-            if (stat.LockedUntilUtc.HasValue && stat.LockedUntilUtc.Value > DateTime.UtcNow)
+            if (statistic.LockedUntilUtc.HasValue && statistic.LockedUntilUtc.Value > DateTime.UtcNow)
             {
-                throw new InvalidOperationException($"SMS locked until {stat.LockedUntilUtc.Value:O}");
+                throw new Exception($"SMS locked until {statistic.LockedUntilUtc.Value:O}");
             }
 
-            if (stat.AttemptCount >= _options.MaxPerDay)
+            if (statistic.AttemptCount >= _options.MaxPerDay)
             {
-                stat.LockedUntilUtc = DateTime.UtcNow.AddMinutes(_options.LockDurationMinutes);
-                await _db.SaveChangesAsync(ct);
-                throw new InvalidOperationException($"SMS limit exceeded. Locked for {_options.LockDurationMinutes} minutes.");
+                statistic.LockedUntilUtc = DateTime.UtcNow.AddMinutes(_options.LockDurationMinutes);
+                await _unitOfWork.CompleteAsync(ct);
+                throw new Exception($"SMS limit exceeded. Locked for {_options.LockDurationMinutes} minutes.");
             }
         }
 
@@ -65,8 +66,7 @@ namespace SmsGateway.Implement.Services
 
             for (var retry = 0; retry < 3; retry++)
             {
-                var stat = await _db.SmsDailyStatistics
-                    .SingleOrDefaultAsync(x => x.PhoneNumber == phoneNumber && x.Day == today, ct);
+                var stat = await _smsDailyStatisticRepository.SingleOrDefaultAsync(x => x.PhoneNumber == phoneNumber && x.Day == today, ct);
 
                 if (stat == null)
                 {
@@ -78,7 +78,7 @@ namespace SmsGateway.Implement.Services
                         AttemptCount = 0,
                         SuccessCount = 0
                     };
-                    _db.SmsDailyStatistics.Add(stat);
+                    await _smsDailyStatisticRepository.AddAsync(stat);
                 }
 
                 stat.AttemptCount += 1;
@@ -86,12 +86,12 @@ namespace SmsGateway.Implement.Services
 
                 try
                 {
-                    await _db.SaveChangesAsync(ct);
+                    await _unitOfWork.CompleteAsync(ct);
                     return;
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    _db.ChangeTracker.Clear();
+                    _unitOfWork.ClearChangeTracker();
                     // retry on concurrency conflict
                 }
             }

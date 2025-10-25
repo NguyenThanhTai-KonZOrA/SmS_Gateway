@@ -12,18 +12,20 @@ namespace SmsGateway.Common.Repository
         Task<IEnumerable<T>> FindWithoutTrackingAsync(Expression<Func<T, bool>> predicate);
         Task<T> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate);
         Task<bool> AnyAsync(Expression<Func<T, bool>> predicate);
+        Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken);
         Task AddAsync(T entity);
         Task AddRangeAsync(IEnumerable<T> entities);
         Task<int> CountAsync(Expression<Func<T, bool>> predicate);
         void AddRange(IEnumerable<T> entities);
         void Update(T entity);
         void Remove(T entity);
-
+        void UpdateRange(IEnumerable<T> entities);
         void RemoveRange(IEnumerable<T> entities);
 
         // Include-capable helpers
         Task<IEnumerable<T>> GetAllIncludingAsync(params Expression<Func<T, object>>[] includeProperties);
         Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, params Expression<Func<T, object>>[] includeProperties);
+        Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken);
         Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, params Expression<Func<T, object>>[] includeProperties);
 
         // Server-side pagination (orderBy is required for stable paging)

@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using SmsGateway.Common.ApiClient;
+﻿using SmsGateway.Common.ApiClient;
 using SmsGateway.Common.Constants;
 using SmsGateway.Implement.Interface;
 using SmsGateway.Implement.SmsFactory.SmsConfigs.VnptSettings;
