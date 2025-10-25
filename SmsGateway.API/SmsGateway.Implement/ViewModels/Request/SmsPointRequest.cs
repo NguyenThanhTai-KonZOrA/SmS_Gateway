@@ -2,7 +2,7 @@
 
 namespace SmsGateway.Implement.ViewModels.Request
 {
-    public class SmsRequest
+    public class SmsPointRequest
     {
         public string PlayerId { get; set; }
         public string FullName { get; set; }

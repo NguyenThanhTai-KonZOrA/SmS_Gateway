@@ -7,7 +7,7 @@ namespace SmsGateway.Implement.SmsFactory.FactoryService
     public class ViettelSmsProvider : ISmsProvider
     {
         public ViettelSmsProvider() { }
-        public Task<SmsResponse> SendSmsAsync(SmsRequest smsRequest)
+        public Task<SmsResponse> SendSmsAsync(SmsPointRequest smsRequest)
         {
             throw new NotImplementedException();
         }

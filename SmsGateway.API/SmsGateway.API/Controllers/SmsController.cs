@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using SmsGateway.Common.Enum;
+using SmsGateway.Common.Helper;
 using SmsGateway.Implement.Services.Interfaces;
 using SmsGateway.Implement.SmsFactory.FactoryInterface;
 using SmsGateway.Implement.ViewModels.Request;
+using SmsGateway.Implement.ViewModels.Response;
 
 namespace SmsGateway.API.Controllers
 {
@@ -12,28 +14,28 @@ namespace SmsGateway.API.Controllers
     {
         private readonly ILogger<SmsController> _logger;
         private readonly ISmsFactory _smsFactory;
-        private readonly ISmsRateLimiterService _rateLimiter;
+        private readonly ISmsRateLimiterService _rateLimiterService;
         private readonly ISmsLoggingService _loggingService;
         private readonly IOtpService _otpService;
 
         public SmsController(
             ILogger<SmsController> logger,
             ISmsFactory smsFactory,
-            ISmsRateLimiterService rateLimiter,
+            ISmsRateLimiterService rateLimiterService,
             ISmsLoggingService loggingService,
             IOtpService otpService)
         {
             _logger = logger;
             _smsFactory = smsFactory;
-            _rateLimiter = rateLimiter;
+            _rateLimiterService = rateLimiterService;
             _loggingService = loggingService;
             _otpService = otpService;
         }
 
-        [HttpPost("send")]
-        public async Task<IActionResult> SendSms([FromBody] SmsRequest request)
+        [HttpPost("send/point")]
+        public async Task<IActionResult> SendSms([FromBody] SmsPointRequest request)
         {
-            string? correlationId = HttpContext.TraceIdentifier;
+            string? correlationId = StringHelper.GenerateTimeBasedCorrelationId();
 
             try
             {
@@ -49,8 +51,11 @@ namespace SmsGateway.API.Controllers
                     _logger.LogWarning("SMS provider type is not specified");
                 }
 
+                // Normalize phone number to "84..."
+                request.PhoneNumber = PhoneNumberHelper.NormalizeTo84(request.PhoneNumber);
+
                 // Enforce rate limit before sending
-                await _rateLimiter.EnsureAllowedAsync(request.PhoneNumber);
+                await _rateLimiterService.EnsureAllowedAsync(request.PhoneNumber);
 
                 var smsProvider = _smsFactory.CreateSmsProvider(request.Type ?? SmsTypeServiceEnum.VNPT);
 #if DEBUG
@@ -68,9 +73,19 @@ namespace SmsGateway.API.Controllers
                 var response = await smsProvider.SendSmsAsync(request);
 
 #endif
-
-                await _loggingService.LogAsync(request, response, (request.Type ?? SmsTypeServiceEnum.VNPT).ToString(), response?.IsSuccess ?? false, correlationId);
-                await _rateLimiter.RecordAsync(request.PhoneNumber, response?.IsSuccess ?? false);
+                await _loggingService.LogAsync(new SmsLogRequest
+                {
+                    ContractName = request.ContractName,
+                    ContractPhoneNumber = request.ContractPhoneNumber,
+                    FullName = request.FullName,
+                    Message = request.Message,
+                    PhoneNumber = request.PhoneNumber,
+                    PlayerId = request.PlayerId,
+                    PlayerPoint = request.PlayerPoint,
+                    ScheduleTime = request.ScheduleTime,
+                    Type = request.Type
+                }, response, (request.Type ?? SmsTypeServiceEnum.VNPT).ToString(), response?.IsSuccess ?? false, correlationId);
+                await _rateLimiterService.RecordAsync(request.PhoneNumber, response?.IsSuccess ?? false);
 
                 _logger.LogInformation("SMS send response: {@Response}", response);
                 return Ok(response);
@@ -82,6 +97,86 @@ namespace SmsGateway.API.Controllers
             }
         }
 
+        [HttpPost("send-otp")]
+        public async Task<IActionResult> SendSmsOtp([FromBody] SmsOtpRequest request)
+        {
+            string? correlationId = StringHelper.GenerateTimeBasedCorrelationId();
+
+            try
+            {
+                _logger.LogInformation("Received SMS send request: {@Request}", request);
+                if (request == null)
+                {
+                    _logger.LogWarning("SMS send request is null");
+                    return BadRequest(new { Message = "Invalid SMS request" });
+                }
+
+                if (!request.Type.HasValue)
+                {
+                    _logger.LogWarning("SMS provider type is not specified");
+                }
+
+                request.PhoneNumber = PhoneNumberHelper.NormalizeTo84(request.PhoneNumber);
+
+                // Enforce rate limit before sending
+                await _rateLimiterService.EnsureAllowedAsync(request.PhoneNumber);
+
+                var smsProvider = _smsFactory.CreateSmsProvider(request.Type ?? SmsTypeServiceEnum.VNPT);
+#if DEBUG
+                var otpCode = await _otpService.GenerateAsync(request.PhoneNumber);
+                var response = new SmsResponse
+                {
+                    IsSuccess = true,
+                    ErrorCode = "0",
+                    ProviderName = "VNPT",
+                    ErrorMessage = "success",
+                    OtpCode = otpCode,
+                    ProviderMessageId = ""
+                };
+#elif RELEASE
+                //var response = await smsProvider.SendSmsAsync(request);
+                var otpCode = await _otpService.GenerateAsync(request.PhoneNumber);
+                var response = new SmsResponse
+                {
+                    IsSuccess = true,
+                    ErrorCode = "0",
+                    ProviderName = "VNPT",
+                    ErrorMessage = "success",
+                    OtpCode = otpCode,
+                    ProviderMessageId = ""
+                };
+#endif
+                await _loggingService.LogAsync(new SmsLogRequest
+                {
+                    ContractName = "",
+                    ContractPhoneNumber = "",
+                    FullName = request.FullName,
+                    Message = request.Message,
+                    PhoneNumber = request.PhoneNumber,
+                    PlayerId = "",
+                    PlayerPoint = "",
+                    ScheduleTime = DateTime.UtcNow,
+                    Type = request.Type
+                }, response, (request.Type ?? SmsTypeServiceEnum.VNPT).ToString(), response?.IsSuccess ?? false, correlationId);
+                await _rateLimiterService.RecordAsync(request.PhoneNumber, response?.IsSuccess ?? false);
+
+                _logger.LogInformation("SMS send response: {@Response}", response);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while sending SMS by {phoneNumber}", request?.PhoneNumber);
+                var error = new SmsResponse
+                {
+                    IsSuccess = false,
+                    ErrorCode = "1",
+                    ErrorMessage = ex.Message,
+                    ProviderName = (request?.Type ?? SmsTypeServiceEnum.VNPT).ToString()
+                };
+                return BadRequest(error);
+            }
+        }
+
         [HttpPost("otp/generate")]
         public async Task<IActionResult> GenerateOtp([FromBody] string phoneNumber)
         {
@@ -90,21 +185,31 @@ namespace SmsGateway.API.Controllers
                 return BadRequest(new { Message = "Phone number is required" });
             }
 
-            var code = await _otpService.GenerateAsync(phoneNumber);
-            // You can now send this code via your existing SendSms endpoint/provider.
-            return Ok(new { PhoneNumber = phoneNumber, Code = code, Message = "OTP generated" });
+            var normalized = PhoneNumberHelper.NormalizeTo84(phoneNumber);
+            var code = await _otpService.GenerateAsync(normalized);
+            return Ok(new { PhoneNumber = normalized, Code = code, Message = "OTP generated" });
         }
 
-        [HttpPost("otp/verify")]
-        public async Task<IActionResult> VerifyOtp([FromBody] VerifySmsOtpRequest smsOtpRequest )
+        [HttpPost("verify-otp")]
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifySmsOtpRequest smsOtpRequest)
         {
-            if (string.IsNullOrWhiteSpace(smsOtpRequest.PhoneNumber) || string.IsNullOrWhiteSpace(smsOtpRequest.OtpCode))
+            try
             {
-                return BadRequest(new { Message = "Phone number and code are required" });
-            }
+                if (string.IsNullOrWhiteSpace(smsOtpRequest.PhoneNumber) || string.IsNullOrWhiteSpace(smsOtpRequest.OtpCode))
+                {
+                    return BadRequest(new { Message = "Phone number and code are required" });
+                }
 
-            var ok = await _otpService.VerifyAsync(smsOtpRequest);
-            return Ok(new { PhoneNumber = smsOtpRequest.PhoneNumber, Verified = ok });
+                smsOtpRequest.PhoneNumber = PhoneNumberHelper.NormalizeTo84(smsOtpRequest.PhoneNumber);
+
+                var result = await _otpService.VerifyAsync(smsOtpRequest);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while verify SMS by {phoneNumber}", smsOtpRequest?.PhoneNumber);
+                throw new BadHttpRequestException(ex.Message);
+            }
         }
     }
 }

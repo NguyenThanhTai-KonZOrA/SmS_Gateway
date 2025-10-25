@@ -18,7 +18,7 @@ namespace SmsGateway.Implement.Services
             _logger = logger;
         }
 
-        public async Task LogAsync(SmsRequest request, SmsResponse response, string provider, bool success, string? correlationId, CancellationToken ct = default)
+        public async Task LogAsync(SmsLogRequest request, SmsResponse response, string provider, bool success, string? correlationId, CancellationToken ct = default)
         {
             var log = new SmsSendLog
             {

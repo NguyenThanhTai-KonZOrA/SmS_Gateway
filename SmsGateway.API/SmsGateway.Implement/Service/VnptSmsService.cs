@@ -22,7 +22,7 @@ namespace SmsGateway.Implement.Service
             _vnptSmsSettings = vnptSmsSettings;
         }
 
-        public async Task<VnptSmsResponse> SendSmsAsnyc(SmsRequest smsRequest)
+        public async Task<VnptSmsResponse> SendSmsAsnyc(SmsPointRequest smsRequest)
         {
             //var response = JsonConvert.DeserializeObject<VnptSmsResponse>("{\"RPLY\":{\"ERROR_DESC\":\"success\",\"name\":\"send_sms_list\",\"ERROR\":\"31\"}}");
             //return response;

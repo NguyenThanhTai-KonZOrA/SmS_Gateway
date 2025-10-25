@@ -5,6 +5,6 @@ namespace SmsGateway.Implement.Interface
 {
     public interface IVnptSmsService
     {
-        Task<VnptSmsResponse> SendSmsAsnyc(SmsRequest smsRequest);
+        Task<VnptSmsResponse> SendSmsAsnyc(SmsPointRequest smsRequest);
     }
 }

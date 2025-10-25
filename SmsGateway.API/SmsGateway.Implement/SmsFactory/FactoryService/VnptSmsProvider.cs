@@ -18,7 +18,7 @@ namespace SmsGateway.Implement.SmsFactory.FactoryService
             _vnptSmsService = vnptSmsService;
         }
 
-        public async Task<SmsResponse> SendSmsAsync(SmsRequest smsRequest)
+        public async Task<SmsResponse> SendSmsAsync(SmsPointRequest smsRequest)
         {
             var response = await _vnptSmsService.SendSmsAsnyc(smsRequest);
 
