@@ -1,6 +1,5 @@
 ﻿using Newtonsoft.Json;
 using SmsGateway.Common.ApiClient;
-using System.Net.Http.Json;
 using System.Text;
 
 public class ApiClient : IApiClient
@@ -16,13 +15,18 @@ public class ApiClient : IApiClient
     {
         try
         {
-            var response = await _httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<TResponse>();
+            using var response = await _httpClient.GetAsync(url);
+            var content = await SafeReadContentAsync(response);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                LogBadResponse(response, content);
+            }
+
+            return DeserializeOrDefault<TResponse>(content);
         }
         catch (HttpRequestException ex)
         {
-            // Log or handle error as needed
             Console.WriteLine($"GET request failed: {ex.Message}");
             return default;
         }
@@ -35,19 +39,28 @@ public class ApiClient : IApiClient
             Content = new StringContent(JsonConvert.SerializeObject(data), encoding: null, "application/json")
         };
 
-        using var response = await _httpClient.SendAsync(request);
-        var content = await response.Content.ReadAsStringAsync();
+        try
+        {
+            using var response = await _httpClient.SendAsync(request);
+            var content = await SafeReadContentAsync(response);
 
-        response.EnsureSuccessStatusCode();
-        return JsonConvert.DeserializeObject<TResponse>(content);
+            if (!response.IsSuccessStatusCode)
+            {
+                LogBadResponse(response, content);
+            }
+
+            return DeserializeOrDefault<TResponse>(content);
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"POST request failed: {ex.Message}");
+            return default;
+        }
     }
 
     public async Task<TResponse?> PostAsync<TRequest, TResponse>(string url, TRequest data, Dictionary<string, string>? headers)
     {
-
-        var stringReq = JsonConvert.SerializeObject(data);
-        using var client = new HttpClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json")
         };
@@ -56,23 +69,84 @@ public class ApiClient : IApiClient
         {
             foreach (var header in headers)
             {
-                request.Headers.Add(header.Key, header.Value);
+                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             }
         }
 
-        var response = await client.SendAsync(request);
-        response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        return JsonConvert.DeserializeObject<TResponse>(responseContent);
+        try
+        {
+            using var response = await _httpClient.SendAsync(request);
+            var content = await SafeReadContentAsync(response);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                LogBadResponse(response, content);
+            }
+
+            return DeserializeOrDefault<TResponse>(content);
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"POST request (with headers) failed: {ex.Message}");
+            return default;
+        }
     }
 
     public async Task<TResponse?> PostAsync<TResponse>(string url, MultipartFormDataContent dataContent)
     {
-        using var client = new HttpClient();
+        try
+        {
+            using var response = await _httpClient.PostAsync(url, dataContent);
+            var content = await SafeReadContentAsync(response);
 
-        var response = await client.PostAsync(url, dataContent);
-        response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        return JsonConvert.DeserializeObject<TResponse>(responseContent);
+            if (!response.IsSuccessStatusCode)
+            {
+                LogBadResponse(response, content);
+            }
+
+            return DeserializeOrDefault<TResponse>(content);
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"POST multipart request failed: {ex.Message}");
+            return default;
+        }
+    }
+
+    private static async Task<string> SafeReadContentAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            return await response.Content.ReadAsStringAsync();
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static TResponse? DeserializeOrDefault<TResponse>(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return default;
+
+        try
+        {
+            return JsonConvert.DeserializeObject<TResponse>(content);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to deserialize response to {typeof(TResponse).Name}: {ex.Message}");
+            return default;
+        }
+    }
+
+    private static void LogBadResponse(HttpResponseMessage response, string content)
+    {
+        var url = response.RequestMessage?.RequestUri?.ToString() ?? "(unknown)";
+        Console.WriteLine($"HTTP {(int)response.StatusCode} {response.ReasonPhrase} for {url}");
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            Console.WriteLine($"Response body: {content}");
+        }
     }
 }
