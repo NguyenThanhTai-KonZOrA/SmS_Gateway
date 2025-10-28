@@ -5,6 +5,7 @@ namespace SmsGateway.Implement.SmsFactory.FactoryInterface
 {
     public interface ISmsProvider
     {
-        Task<SmsResponse> SendSmsAsync(SmsPointRequest smsRequest);
+        Task<SmsResponse> SendPointSmsAsync(SmsPointRequest smsRequest);
+        Task<SmsResponse> SendOtpSmsAsync(SmsOtpRequest smsRequest);
     }
 }

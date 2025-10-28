@@ -18,9 +18,35 @@ namespace SmsGateway.Implement.SmsFactory.FactoryService
             _vnptSmsService = vnptSmsService;
         }
 
-        public async Task<SmsResponse> SendSmsAsync(SmsPointRequest smsRequest)
+        public async Task<SmsResponse> SendPointSmsAsync(SmsPointRequest smsRequest)
         {
-            var response = await _vnptSmsService.SendSmsAsnyc(smsRequest);
+            var response = await _vnptSmsService.SendPointSmsAsnyc(smsRequest);
+
+            if (response?.RPLY != null && response.RPLY.ERROR_DESC == CommonConstants.Success && response.RPLY.ERROR == CommonConstants.CodeSuccess)
+            {
+                return new SmsResponse
+                {
+                    IsSuccess = true,
+                    ErrorCode = response.RPLY.ERROR_DESC,
+                    ProviderName = SmsTypeServiceEnum.VNPT.ToString(),
+                    ErrorMessage = ErrorrMessageMapper.GetMessage(VnptErrorMessages(), response?.RPLY.ERROR ?? CommonConstants.UnknownErrorCode),
+                };
+            }
+            else
+            {
+                return new SmsResponse
+                {
+                    IsSuccess = false,
+                    ErrorCode = response?.RPLY.ERROR_DESC ?? CommonConstants.UnknownError,
+                    ProviderName = SmsTypeServiceEnum.VNPT.ToString(),
+                    ErrorMessage = ErrorrMessageMapper.GetMessage(VnptErrorMessages(), response?.RPLY.ERROR ?? CommonConstants.UnknownErrorCode)
+                };
+            }
+        }
+
+        public async Task<SmsResponse> SendOtpSmsAsync(SmsOtpRequest smsOtpRequest)
+        {
+            var response = await _vnptSmsService.SendSmsOtpAsnyc(smsOtpRequest);
 
             if (response?.RPLY != null && response.RPLY.ERROR_DESC == CommonConstants.Success && response.RPLY.ERROR == CommonConstants.CodeSuccess)
             {

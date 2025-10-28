@@ -22,7 +22,7 @@ namespace SmsGateway.Implement.Services
 
         public async Task LogAsync(SmsLogRequest request, SmsResponse response, string provider, bool success, string? correlationId, CancellationToken ct = default)
         {
-            var log = new SmsSendLog
+            var smslog = new SmsSendLog
             {
                 Id = Guid.NewGuid(),
                 PhoneNumber = request.PhoneNumber,
@@ -37,7 +37,7 @@ namespace SmsGateway.Implement.Services
                 CorrelationId = correlationId
             };
 
-            await _smsSendLogRepository.AddAsync(log);
+            await _smsSendLogRepository.AddAsync(smslog);
             await _unitOfWork.CompleteAsync(ct);
         }
     }

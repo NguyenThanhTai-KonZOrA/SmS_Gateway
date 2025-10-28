@@ -89,7 +89,7 @@ namespace SmsGateway.Implement.Services
             if (otp == null) return result;
 
             // Important !!! Ignore For test
-            //if (!string.Equals(otp.Code, smsOtpRequest.OtpCode, StringComparison.Ordinal)) return result;
+            if (!string.Equals(otp.Code, smsOtpRequest.OtpCode, StringComparison.Ordinal)) return result;
 
             if (otp.ExpiresAtUtc <= now) return result;
 

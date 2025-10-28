@@ -9,7 +9,7 @@ namespace SmsGateway.Common.Helper
         {
             long unixTimestampSeconds = DateTimeOffset.Now.ToUnixTimeSeconds();
             string unixTimestampString = unixTimestampSeconds.ToString();
-            return $"TheGrandHT_" + unixTimestampString;
+            return $"TheGrandHoTram_" + unixTimestampString;
         }
 
         public static string GenerateNumericCode(int length)
@@ -19,7 +19,7 @@ namespace SmsGateway.Common.Helper
             var sb = new StringBuilder(length);
             foreach (var b in bytes)
             {
-                sb.Append((b % 10).ToString());
+                sb.Append(b % 10);
             }
             return sb.ToString();
         }

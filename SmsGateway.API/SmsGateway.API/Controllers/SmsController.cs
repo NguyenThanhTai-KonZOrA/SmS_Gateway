@@ -32,8 +32,8 @@ namespace SmsGateway.API.Controllers
             _otpService = otpService;
         }
 
-        [HttpPost("send/point")]
-        public async Task<IActionResult> SendSms([FromBody] SmsPointRequest request)
+        [HttpPost("send-point")]
+        public async Task<IActionResult> SendPointSmsÁync([FromBody] SmsPointRequest request)
         {
             string? correlationId = StringHelper.GenerateTimeBasedCorrelationId();
 
@@ -58,21 +58,7 @@ namespace SmsGateway.API.Controllers
                 await _rateLimiterService.EnsureAllowedAsync(request.PhoneNumber);
 
                 var smsProvider = _smsFactory.CreateSmsProvider(request.Type ?? SmsTypeServiceEnum.VNPT);
-#if DEBUG
-                var otpCode = await _otpService.GenerateAsync(request.PhoneNumber);
-                var response = new Implement.ViewModels.Response.SmsResponse
-                {
-                    IsSuccess = true,
-                    ErrorCode = "0",
-                    ProviderName = "VNPT",
-                    ErrorMessage = "success",
-                    OtpCode = otpCode,
-                    ProviderMessageId = ""
-                };
-#elif RELEASE
-                var response = await smsProvider.SendSmsAsync(request);
-
-#endif
+                var response = await smsProvider.SendPointSmsAsync(request);
                 await _loggingService.LogAsync(new SmsLogRequest
                 {
                     ContractName = request.ContractName,
@@ -98,7 +84,7 @@ namespace SmsGateway.API.Controllers
         }
 
         [HttpPost("send-otp")]
-        public async Task<IActionResult> SendSmsOtp([FromBody] SmsOtpRequest request)
+        public async Task<IActionResult> SendSmsOtpAsync([FromBody] SmsOtpRequest request)
         {
             string? correlationId = StringHelper.GenerateTimeBasedCorrelationId();
 
@@ -120,32 +106,19 @@ namespace SmsGateway.API.Controllers
 
                 // Enforce rate limit before sending
                 await _rateLimiterService.EnsureAllowedAsync(request.PhoneNumber);
-
                 var smsProvider = _smsFactory.CreateSmsProvider(request.Type ?? SmsTypeServiceEnum.VNPT);
-#if DEBUG
                 var otpCode = await _otpService.GenerateAsync(request.PhoneNumber);
-                var response = new SmsResponse
+
+                var response = await smsProvider.SendOtpSmsAsync(new SmsOtpRequest
                 {
-                    IsSuccess = true,
-                    ErrorCode = "0",
-                    ProviderName = "VNPT",
-                    ErrorMessage = "success",
+                    FullName = request.FullName,
+                    PhoneNumber = request.PhoneNumber,
+                    Message = request.Message,
                     OtpCode = otpCode,
-                    ProviderMessageId = ""
-                };
-#elif RELEASE
-                //var response = await smsProvider.SendSmsAsync(request);
-                var otpCode = await _otpService.GenerateAsync(request.PhoneNumber);
-                var response = new SmsResponse
-                {
-                    IsSuccess = true,
-                    ErrorCode = "0",
-                    ProviderName = "VNPT",
-                    ErrorMessage = "success",
-                    OtpCode = otpCode,
-                    ProviderMessageId = ""
-                };
-#endif
+                    Type = request.Type,
+                    CorrelationId = correlationId
+                });
+
                 await _loggingService.LogAsync(new SmsLogRequest
                 {
                     ContractName = "",
@@ -177,7 +150,7 @@ namespace SmsGateway.API.Controllers
             }
         }
 
-        [HttpPost("otp/generate")]
+        [HttpPost("otp-generate")]
         public async Task<IActionResult> GenerateOtp([FromBody] string phoneNumber)
         {
             if (string.IsNullOrWhiteSpace(phoneNumber))

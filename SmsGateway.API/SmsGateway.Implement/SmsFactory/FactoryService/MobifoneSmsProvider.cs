@@ -7,7 +7,13 @@ namespace SmsGateway.Implement.SmsFactory.FactoryService
     public class MobifoneSmsProvider : ISmsProvider
     {
         public MobifoneSmsProvider() { }
-        public Task<SmsResponse> SendSmsAsync(SmsPointRequest smsRequest)
+
+        public Task<SmsResponse> SendOtpSmsAsync(SmsOtpRequest smsRequest)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<SmsResponse> SendPointSmsAsync(SmsPointRequest smsRequest)
         {
             throw new NotImplementedException();
         }
