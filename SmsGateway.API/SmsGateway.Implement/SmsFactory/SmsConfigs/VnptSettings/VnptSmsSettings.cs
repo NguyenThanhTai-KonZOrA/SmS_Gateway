@@ -4,7 +4,7 @@
     {
         public string BaseUrl { get; set; }
         public string Name { get; set; }
-        public string LabelID { get; set; }
+        public string LabelId { get; set; }
         public string ContractTypeId { get; set; }
         public string ContractId { get; set; }
         public string TemplateSmsPointId { get; set; }

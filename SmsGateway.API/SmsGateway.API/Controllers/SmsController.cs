@@ -108,7 +108,20 @@ namespace SmsGateway.API.Controllers
                 await _rateLimiterService.EnsureAllowedAsync(request.PhoneNumber);
                 var smsProvider = _smsFactory.CreateSmsProvider(request.Type ?? SmsTypeServiceEnum.VNPT);
                 var otpCode = await _otpService.GenerateAsync(request.PhoneNumber);
+#if DEBUG
+                _logger.LogInformation("Generated OTP code: {OtpCode} for phone number: {PhoneNumber}", otpCode, request.PhoneNumber);
+                var response = new SmsResponse
+                {
+                    IsSuccess = true,
+                    ErrorCode = "0",
+                    ErrorMessage = "Debug mode - OTP not sent",
+                    ProviderName = (request.Type ?? SmsTypeServiceEnum.VNPT).ToString(),
+                    OtpCode = otpCode,
+                    ProviderMessageId = ""
+                };
 
+#elif RELEASE
+                _logger.LogInformation("Generated OTP code: {OtpCode} for phone number: {PhoneNumber}", otpCode, request.PhoneNumber);
                 var response = await smsProvider.SendOtpSmsAsync(new SmsOtpRequest
                 {
                     FullName = request.FullName,
@@ -118,13 +131,13 @@ namespace SmsGateway.API.Controllers
                     Type = request.Type,
                     CorrelationId = correlationId
                 });
-
+#endif
                 await _loggingService.LogAsync(new SmsLogRequest
                 {
                     ContractName = "",
                     ContractPhoneNumber = "",
-                    FullName = request.FullName,
-                    Message = request.Message,
+                    FullName = request.FullName ?? string.Empty,
+                    Message = request.Message ?? string.Empty,
                     PhoneNumber = request.PhoneNumber,
                     PlayerId = "",
                     PlayerPoint = "",

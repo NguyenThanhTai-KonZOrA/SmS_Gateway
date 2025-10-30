@@ -56,6 +56,8 @@ namespace SmsGateway.Implement.SmsFactory.FactoryService
                     ErrorCode = response.RPLY.ERROR_DESC,
                     ProviderName = SmsTypeServiceEnum.VNPT.ToString(),
                     ErrorMessage = ErrorrMessageMapper.GetMessage(VnptErrorMessages(), response?.RPLY.ERROR ?? CommonConstants.UnknownErrorCode),
+                    OtpCode = smsOtpRequest.OtpCode,
+                    ProviderMessageId = ""
                 };
             }
             else
@@ -65,7 +67,9 @@ namespace SmsGateway.Implement.SmsFactory.FactoryService
                     IsSuccess = false,
                     ErrorCode = response?.RPLY.ERROR_DESC ?? CommonConstants.UnknownError,
                     ProviderName = SmsTypeServiceEnum.VNPT.ToString(),
-                    ErrorMessage = ErrorrMessageMapper.GetMessage(VnptErrorMessages(), response?.RPLY.ERROR ?? CommonConstants.UnknownErrorCode)
+                    ErrorMessage = ErrorrMessageMapper.GetMessage(VnptErrorMessages(), response?.RPLY.ERROR ?? CommonConstants.UnknownErrorCode),
+                    OtpCode = smsOtpRequest.OtpCode,
+                    ProviderMessageId = ""
                 };
             }
         }

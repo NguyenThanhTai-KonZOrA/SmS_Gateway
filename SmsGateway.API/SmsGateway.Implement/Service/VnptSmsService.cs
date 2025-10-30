@@ -1,4 +1,5 @@
-﻿using SmsGateway.Common.ApiClient;
+﻿using Microsoft.Extensions.Logging;
+using SmsGateway.Common.ApiClient;
 using SmsGateway.Common.Constants;
 using SmsGateway.Implement.Interface;
 using SmsGateway.Implement.Services.Interfaces;
@@ -11,13 +12,16 @@ namespace SmsGateway.Implement.Service
 {
     public class VnptSmsService : IVnptSmsService
     {
+        private readonly ILogger<VnptSmsService> _logger;
         private readonly IApiClient _apiClient;
         private readonly VnptSmsSettings _vnptSmsSettings;
         public VnptSmsService(
+            ILogger<VnptSmsService> logger,
                IApiClient apiClient,
                VnptSmsSettings vnptSmsSettings
             )
         {
+            _logger = logger;
             _apiClient = apiClient;
             _vnptSmsSettings = vnptSmsSettings;
         }
@@ -32,7 +36,7 @@ namespace SmsGateway.Implement.Service
                 {
                     name = _vnptSmsSettings.Name,
                     REQID = "1396000023",
-                    LABELID = _vnptSmsSettings.LabelID,
+                    LABELID = _vnptSmsSettings.LabelId,
                     CONTRACTTYPEID = _vnptSmsSettings.ContractTypeId,
                     CONTRACTID = _vnptSmsSettings.ContractId,
                     TEMPLATEID = _vnptSmsSettings.TemplateSmsPointId,
@@ -66,19 +70,32 @@ namespace SmsGateway.Implement.Service
         {
             //var response = JsonConvert.DeserializeObject<VnptSmsResponse>("{\"RPLY\":{\"ERROR_DESC\":\"success\",\"name\":\"send_sms_list\",\"ERROR\":\"31\"}}");
             //return response;
+            if (string.IsNullOrEmpty(smsOtpRequest.OtpCode) && string.IsNullOrEmpty(smsOtpRequest.PhoneNumber))
+            {
+                return new VnptSmsResponse
+                {
+                    RPLY = new RPLY
+                    {
+                        ERROR_DESC = "Invalid input: OtpCode and PhoneNumber are required.",
+                        name = "send_sms_list",
+                        ERROR = "-1",
+                    }
+                };
+            }
+
             var stringContentSms = new VnptSmsRequest
             {
                 RQST = new RQST
                 {
                     name = _vnptSmsSettings.Name,
                     REQID = smsOtpRequest.CorrelationId,
-                    LABELID = _vnptSmsSettings.LabelID,
+                    LABELID = _vnptSmsSettings.LabelId,
                     CONTRACTTYPEID = _vnptSmsSettings.ContractTypeId,
                     CONTRACTID = _vnptSmsSettings.ContractId,
                     TEMPLATEID = _vnptSmsSettings.TemplateSmsOtpId,
                     PARAMS =
                     [
-                        new() { NUM = "1", CONTENT = smsOtpRequest.OtpCode},
+                        new() { NUM = "1", CONTENT = smsOtpRequest.OtpCode },
                     ],
                     SCHEDULETIME = "",
                     MOBILELIST = smsOtpRequest.PhoneNumber,
@@ -87,13 +104,32 @@ namespace SmsGateway.Implement.Service
                     APIUSER = _vnptSmsSettings.ApiUser,
                     APIPASS = _vnptSmsSettings.ApiPass,
                     USERNAME = _vnptSmsSettings.UserName,
-                    DATACODING = _vnptSmsSettings.DataCoding
+                    DATACODING = "0"
                 }
             };
+            _logger.LogInformation("VNPT SMS OTP Request: {@Request}", stringContentSms);
 
             var response = await _apiClient.PostAsync<VnptSmsRequest, VnptSmsResponse>(_vnptSmsSettings.BaseUrl, stringContentSms);
-
-            return response ?? new VnptSmsResponse();
+            _logger.LogInformation("End SMS OTP Request");
+            if (response != null)
+            {
+                _logger.LogInformation("Send SMS success Phone: {PhoneNumber}, Code: {OtpCode}", smsOtpRequest.PhoneNumber, smsOtpRequest.OtpCode);
+                return response;
+            }
+            else
+            {
+                _logger.LogError("Send SMS Faild Phone: {PhoneNumber}, Code: {OtpCode}", smsOtpRequest.PhoneNumber, smsOtpRequest.OtpCode);
+                _logger.LogInformation("Reesponse SMS OTP : {@response}", response);
+                return new VnptSmsResponse
+                {
+                    RPLY = new RPLY
+                    {
+                        ERROR_DESC = CommonConstants.UnknownError,
+                        name = "send_sms_list",
+                        ERROR = CommonConstants.UnknownErrorCode,
+                    }
+                };
+            }
         }
     }
 }
